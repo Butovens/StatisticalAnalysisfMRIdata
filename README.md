@@ -1,0 +1,4 @@
+# This is an example of statistical analysis of fMRI data
+The fMRI.csv file is a of neuroimaging data. The researchers examined brain activity to 2 brain networks of interest - multiple demand (executive function) and language -during sentence reading & word reading conditions across many different experiments. Each brain network contains multiple regions of interest (ROIs), 20 for MD and 6 for language; the MD regions are located in both hemispheres, whereas the language ROIs are only located in the left hemisphere. The outcome,
+Effect_Size, represents average increase in brain activity across trials relative to baseline brain activity
+(when no stimulus is being presented).

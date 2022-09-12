@@ -1,0 +1,214 @@
+---
+title: "Statistical analysis of fMRI data"
+author: "Butovens Médé"
+date: "3/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+### Load libraries needed
+library(tidyverse)
+library(dplyr)
+library(skimr)
+
+### Read data
+fMRI_data <- read_csv(file.choose())
+
+### Look at data
+skim(fMRI_data)
+```
+
+## A
+```{r}
+### Average Effect_size measure over Experiments, Regions, and Hemispheres for each SubjectID:
+# save new dataframe to object
+simplified_fMRI_data <- fMRI_data %>% 
+  # filter out 'auditory modality
+  filter(Modality == 'visual') %>%
+  # group by SubjectID, Condition, System, and Task (because we want to average the Effect_size measure over Experiments, Regions, and Hemispheres for each SubjectID)
+  group_by(SubjectID, Condition, System, Task) %>% 
+  # average Effect_Size
+  summarize(count = n(), Effect_Size = mean(Effect_Size)) %>% 
+  # ungroup to avoid potential problem later on
+  ungroup()
+
+### Results
+simplified_fMRI_data
+```
+
+## B
+```{r}
+# Plot the mean EffectSize by Condition, System, and Task
+ggplot(data = simplified_fMRI_data, 
+       mapping = aes(x = Condition, 
+                     y = Effect_Size,
+                     color = System)) +
+  geom_point(position = position_jitter()) +
+  stat_summary(aes(x = Condition, y = Effect_Size, group = System),
+               fun = 'mean', geom = 'line') +
+  facet_grid(Task~.) +
+  labs(title = "Mean Effect size by Condition, System and Task ",
+        x = "Condition by Task",
+        y = "Mean effect size") +
+    theme_bw() +
+    theme(text=element_text(size = 12)) 
+  
+```
+
+## C
+```{r}
+# Change variables in data frame that need to be factors variable and save it to new object
+m1_data <- simplified_fMRI_data %>% 
+  # Change necessary character variables to factors
+  mutate(SubjectID = factor(SubjectID),
+         Condition = factor(Condition),
+         System = factor(System),
+         Task = factor(Task)) 
+
+# Check contrast coding for Condition factor
+# colnames(contrasts(m1_data$Condition)) <- "Condition"
+contrasts(m1_data$Condition) 
+
+# Check contrast coding for System factor
+# colnames(contrasts(m1_data$System)) <- "System"
+contrasts(m1_data$System)
+
+# Check contrast coding for Task factor
+# colnames(contrasts(m1_data$Task)) <- "Task"
+contrasts(m1_data$Task)
+
+
+### Regression analysis
+m1 <- lm(Effect_Size ~  1 + Condition * System * Task, data = m1_data)
+
+# Results
+summary(m1)$coef
+```
+
+* The default dummy coding was used for this analysis: \
+- Levels in Condition were coded: '0' for Sentence, and '1' for Word \
+- Levels in System were coded: '0' for language, and '1' for MD \
+- Levels in Task were coded: '0' for passive, and '1' for task \
+
+* Overall, the results seem to indicate that there is significant simple effects of Condition, System, and Task, and that there is significant interactions between Condition and System, Condition and Task, and System and Task. There's is also a 3-way interaction between Condition, System and Task (which is more difficult to interpret)
+
+* The results from this regression tells us that the average neural activity value (i.e. effect size) in the language network of participants in the Sentence reading condition, doing the passive task is $1.005$ (i.e. intercept).
+
+* There is a significant simple effect of condition. Here this means that the neural activity in the language network of participants in the Word reading condition and doing the passive task is lower on average by $0.622$ (compared to the average neural activity in the Sentence reading condition).
+
+* There is a significant simple effect of system. This means that the average neural activity in the multiple-demand brain network of participants in the Sentence reading condition, and doing the passive task is lower on average by $1.03$ (compared to the neural activity in the language network under the same circumstances).
+
+* There is a significant of task. This means that the average neural activity in the language network of participants in the Word reading condition and doing the 'active' task is lower on average by $0.326$ (compared to the average neural activity when in the passive task). 
+
+*Note: The interpretation of the interactions may be inaccurate. Would need to do interaction plots with the necessary variables to better understand impact of one variables on the other.*
+
+* There is a significant interaction between condition and System. Thus, the average neural activity in the multiple-demand brain network of participants in the Word reading Condition and doing the passive task is higher on average by $0.79$ (compared to the baseline i.e. average neural activity value in the language network of participants in the Sentence reading condition, and doing the passive task)
+
+* There is a significant interaction between condition and Task. Thus, the average neural activity in the language network of participants in the Word reading Condition and doing the 'active' task is higher on average by $0.364$ (compared to the baseline i.e. average neural activity value in the language network of participants in the Sentence reading condition, and doing the passive task)
+
+* There is a significant interaction between system and Task. Thus, the average neural activity in the multiple-demand brain network of participants in the Sentence reading Condition and doing the 'active' task is higher on average by $0.331$ (compared to the baseline i.e. average neural activity value in the language network of participants in the Sentence reading condition, and doing the passive task)
+
+* There is also the significant 3-way interactions between condition, system and task. Here it means that the average neural activity in the multiple-demand brain network of participants in the Word reading Condition and doing the 'active' task is lower on average by $0.434$ (compared to the baseline i.e. average neural activity value in the language network of participants in the Sentence reading condition, and doing the passive task)
+
+
+## D
+```{r}
+### Average Effect_size measure over Experiments, and Tasks for each SubjectID:
+# save new dataframe to object
+simplified_fMRI_data2 <- fMRI_data %>% 
+  # filter out MD system and auditory modality
+  filter(System == "language" & Modality == "visual") %>%
+  # group by SubjectID, Region, Condition, and Hemisphere (because we want to average over Experiments and Tasks for each Subject
+  group_by(SubjectID, Region, Condition, Hemisphere) %>%
+  # average Effect_Size
+  summarize(count = n(), m_Effect_Size = mean(Effect_Size)) %>% 
+  # ungroup to avoid potential problem later on  
+  ungroup()
+
+### Results
+simplified_fMRI_data2
+```
+
+
+## E
+```{r}
+# Plot the mean Effect Size by Condition and Region
+ggplot(data = simplified_fMRI_data2,
+       mapping = aes(x = Condition,
+                     y = m_Effect_Size,
+                     color = Region)) +
+  geom_point(position = position_jitter()) +
+   stat_summary(aes(x = Condition, y = m_Effect_Size, group = Region), color = "black",
+               fun = 'mean', geom = 'line') +
+  facet_wrap(~Region) +
+  labs(title = "Mean Effect size by Region and Condition ",
+        x = "Condition by Region",
+        y = "Mean effect size") +
+    theme_bw() +
+    theme(text=element_text(size = 12)) 
+```
+
+## F
+```{r}
+# Change variables in data frame that need to be factors variable and save it to new object
+m2_data <- simplified_fMRI_data2 %>% 
+  # Change necessary character variables to factors
+  mutate(SubjectID = factor(SubjectID),
+         Condition = factor(Condition),
+         Region = factor(Region))
+
+# Change contrast coding for Condition factor
+contrasts(m2_data$Condition) <- c(-0.5,0.5)
+
+# Change column name
+colnames(contrasts(m2_data$Condition)) <- "WvsS"
+
+# Check contrast
+contrasts(m2_data$Condition)
+
+# Change contrast coding for Region factor
+contrasts(m2_data$Region) <- cbind(c(-.5, .5, 0, 0, 0, 0, 0, 0, 0, 0),
+                                   c(-.5, 0, .5, 0, 0, 0, 0, 0, 0, 0),
+                                   c(-.5, 0, 0, .5, 0, 0, 0, 0, 0, 0),
+                                   c(-.5, 0, 0, 0, .5, 0, 0, 0, 0, 0),
+                                   c(-.5, 0, 0, 0, 0, .5, 0, 0, 0, 0),
+                                   c(-.5, 0, 0, 0, 0, 0, .5, 0, 0, 0),
+                                   c(-.5, 0, 0, 0, 0, 0, 0,.5, 0, 0),
+                                   c(-.5, 0, 0, 0, 0, 0, 0, 0,.5, 0),
+                                   c(-.5, 0, 0, 0, 0, 0, 0, 0, 0,.5))
+
+# Change column name
+colnames(contrasts(m2_data$Region)) <- c('LIFG', 'LIFGorb', 'LMFG', 'LPostTemp', 'RAntTemp', 'RIFG', 'RIFGorb', 'RMFG', 'RPostTemp')
+
+
+# Check contrast
+contrasts(m2_data$Region)
+
+### Regression analysis
+m2 <- lm(m_Effect_Size ~  1 + Condition * Region, data = m2_data)
+
+# Results
+summary(m2)
+
+```
+
+* The contrast coding was used for this analysis was a zero-sum contrast: \
+- Levels in Condition were coded: '-0.5' for Sentence, and '0.5' for Word \
+- Levels in Region were coded: LAntTemp was the reference contrast coded '-0.5' and all other levels compared to it ws coded '0.5' (see coding matrix above for coding for all levels)
+
+* Overall, the results seem to indicate that there are significant main effects for condition and all brain regions of the language system.
+
+* The grand mean brain activity value (i.e. effect size) for all language brain regions in all condition is $0.914$.
+
+* There is a main affect of condition. Here this means that the neural activity of participants in the Word reading condition is lower on average by $0.499$ when averaged over all language brain regions.   
+
+* In addition, there seems to be significant main effects and increased neural activity for regions LIFG $(coef = 0.937)$, LIFGorb $(coef = 0.470)$, LMFG $(coef = 1.59)$, and LPostTemp $(coef = 0.627)$ (relative to the grand mean?).
+
+* Also, there seems to be significant main effects and decreased neural activity for regions RAntTemp $(coef = -0.699)$, RIFG $(coef = -0.679)$, RIFGorb $(coef = -0.797)$, RMFG $(coef = -0.635)$, and RPostTem $(coef = -0.682)$ (relative to the grand mean?).
+
+* There are significant interactions between Condition and region LMFG $(coef = -0.686)$, and Condition and region PostTemp $(coef = -0.357)$. Both interactions result in decreased neural activity.
+
+* There are also significant interactions which result in increased neural activity i.e. Condition and region RI $(coef = 0.299)$, Condition and region RIFGorb $(coef = 0.2370)$, Condition and region RMFG $(coef = 0.495)$, and Condition and region RPostTemp $(coef = 0.326)$. 
+
